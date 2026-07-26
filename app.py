@@ -95,30 +95,13 @@ if file_reg and file_broker:
         header_idx = i
         break
 
+    # 🚨 CRITICAL FIX: Reset file pointer back to the start before second read! 🚨
+    file_broker.seek(0)
+
     if file_name_lower.endswith(".csv"):
       df_broker = pd.read_csv(file_broker, skiprows=header_idx).fillna("")
     else:
       df_broker = pd.read_excel(file_broker, skiprows=header_idx).fillna("")
-
-    col_map = {}
-    for col in df_broker.columns:
-      c = str(col).lower().strip()
-      if c in ["security name", "scrip name", "scrip"]:
-        col_map[col] = "Name"
-      elif c in ["trade time", "time"]:
-        col_map[col] = "Time"
-      elif c in ["transaction type", "buy/sell", "type"]:
-        col_map[col] = "Type"
-      elif c in ["quantity", "qty"]:
-        col_map[col] = "Qty"
-      elif c in ["market rate", "price", "rate"]:
-        col_map[col] = "Price"
-      elif c in ["total", "value", "net amount", "net total"]:
-        col_map[col] = "Value"
-
-    df_broker = df_broker.rename(columns=col_map)
-    df_broker = df_broker.loc[:, ~df_broker.columns.duplicated()]
-
     # --- SMART SYMBOL MATCHING ---
     if "Symbol" not in df_broker.columns and "Name" in df_broker.columns:
       df_broker["Symbol"] = (
