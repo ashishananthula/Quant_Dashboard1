@@ -1,3 +1,12 @@
+import sys
+import subprocess
+
+# Bypass Streamlit's broken requirements caching and force-install openpyxl
+try:
+    import openpyxl
+except ImportError:
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "openpyxl"])
+
 import base64
 import os
 import re
@@ -102,6 +111,7 @@ if file_reg and file_broker:
       df_broker = pd.read_csv(file_broker, skiprows=header_idx).fillna("")
     else:
       df_broker = pd.read_excel(file_broker, skiprows=header_idx).fillna("")
+      
     # --- SMART SYMBOL MATCHING ---
     if "Symbol" not in df_broker.columns and "Name" in df_broker.columns:
       df_broker["Symbol"] = (
