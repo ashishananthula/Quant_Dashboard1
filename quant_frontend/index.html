@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quant Strategy Component</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@400;600;700&display=swap');
+        body { font-family: 'Source Sans Pro', sans-serif; background-color: #0e1117; color: #fafafa; margin: 0; padding: 0; }
+        .st-card { background-color: #0f172a; border: 1px solid #1e293b; border-radius: 8px; }
+        .st-metric { background-color: #161b26; border: 1px solid #262c3a; border-radius: 8px; padding: 12px 16px; }
+        .st-metric-value { font-size: 1.8rem; font-weight: 700; line-height: 1.2; }
+        .st-badge-buy { background-color: rgba(16, 185, 129, 0.15); color: #10b981; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 600; }
+        .st-badge-sell { background-color: rgba(244, 63, 94, 0.15); color: #f43f5e; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 600; }
+        .st-badge-traded { background-color: rgba(16, 185, 129, 0.2); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.4); padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #0e1117; }
+        ::-webkit-scrollbar-thumb { background: #31333f; border-radius: 4px; }
+    </style>
+</head>
+<body class="flex flex-col antialiased">
+
+    <!-- Top Header Bar -->
+    <header class="h-12 bg-[#0e1117] border-b border-[#262730] flex items-center px-4 sticky top-0 z-30">
+        <span class="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-emerald-500"></span> Connected to Python Engine &bull; <code class="bg-[#1e232d] px-1.5 py-0.5 rounded text-[11px] text-emerald-400">app.py</code>
+        </span>
+    </header>
+
+    <div id="mainContainer" class="flex-1 flex overflow-hidden">
+        <main class="flex-1 overflow-y-auto p-4 space-y-6 w-full">
+            
+            <div id="loadingState" class="p-8 text-center text-slate-400">
+                <i class="fa-solid fa-spinner fa-spin text-2xl mb-3 text-emerald-500"></i>
+                <p>Waiting for daily files to be uploaded in Streamlit sidebar...</p>
+            </div>
+
+            <div id="dashboardContent" class="hidden space-y-6">
+                
+                <!-- KPI Metrics Summary -->
+                <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                    <div class="st-metric">
+                        <p class="text-xs text-slate-400 font-semibold">Total PNGs Uploaded</p>
+                        <p class="st-metric-value text-white mt-1" id="metricScanned">0</p>
+                    </div>
+                    <div class="st-metric">
+                        <p class="text-xs text-slate-400 font-semibold">Unique Symbols Traded</p>
+                        <p class="st-metric-value text-emerald-400 mt-1" id="metricCaptured">0</p>
+                        <p class="text-[11px] text-emerald-400 font-medium" id="metricCapturedSub">0% Capture Rate</p>
+                    </div>
+                    <div class="st-metric">
+                        <p class="text-xs text-slate-400 font-semibold">Broker Fills Logged</p>
+                        <p class="st-metric-value text-amber-400 mt-1" id="metricFills">0</p>
+                    </div>
+                    <div class="st-metric">
+                        <p class="text-xs text-slate-400 font-semibold">Total Capital Deployed</p>
+                        <p class="st-metric-value text-white mt-1" id="metricTurnover">₹0.00</p>
+                    </div>
+                    <div class="st-metric border-emerald-500/40 bg-emerald-950/20">
+                        <p class="text-xs text-emerald-400 font-semibold">Net Daily Yield</p>
+                        <p class="st-metric-value text-emerald-400 mt-1" id="metricYield">₹0.00</p>
+                        <p class="text-[11px] text-emerald-400 font-medium" id="metricYieldSub">0.00%</p>
+                    </div>
+                </div>
+
+                <hr class="border-[#262730]"/>
+
+                <!-- NEW: EXECUTED SYMBOLS (NO REPEATS) -->
+                <div class="space-y-4">
+                    <div class="flex justify-between items-end">
+                        <div>
+                            <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                                🎯 Successfully Traded Universe
+                            </h2>
+                            <p class="text-xs text-slate-400">Distinct symbols executed from your uploaded Top 70 PNGs (Irrespective of Buy/Sell).</p>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-[#0f172a] p-4 rounded-xl border border-[#1e293b]">
+                        <div id="tradedUniqueContainer" class="flex flex-wrap gap-3">
+                            <!-- JS Populated Unique Traded Badges -->
+                        </div>
+                    </div>
+                </div>
+
+                <hr class="border-[#262730]"/>
+
+                <!-- Parallel Side-by-Side Analysis -->
+                <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                    ⚖️ Captured Symbols Transaction Analysis
+                </h2>
+                
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="space-y-3">
+                        <div class="border-b border-[#262730] pb-2">
+                            <h3 class="font-bold text-sm text-slate-200">📋 Left Side: Total Transactions Done</h3>
+                        </div>
+                        <div id="leftTransactionsContainer" class="space-y-2.5"></div>
+                        <div class="pt-2 text-xs font-mono text-slate-300">
+                            <strong>Total Capital Deployed:</strong> <code class="bg-[#1e232d] px-2 py-1 rounded text-emerald-400 text-xs font-bold" id="leftTotalTurnover">₹0.00</code>
+                        </div>
+                    </div>
+
+                    <div class="space-y-3">
+                        <div class="border-b border-[#262730] pb-2">
+                            <h3 class="font-bold text-sm text-slate-200">💰 Right Side: Yield Obtained by Symbol</h3>
+                        </div>
+                        <div id="rightYieldContainer" class="space-y-2.5"></div>
+                        
+                        <div class="p-4 bg-emerald-950/30 border border-emerald-500/40 rounded-xl flex justify-between items-center mt-4">
+                            <div><small class="text-emerald-400 font-bold uppercase block">Total Yield Obtained Today</small></div>
+                            <div class="text-right">
+                                <span class="text-xl font-bold text-emerald-400 font-mono block" id="rightTotalYieldVal">+₹0.00</span>
+                                <span class="bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded text-xs font-bold font-mono inline-block mt-0.5" id="rightTotalYieldPct">+0.00%</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <hr class="border-[#262730]"/>
+
+                <!-- Traded PNG Charts Section -->
+                <div class="space-y-4">
+                    <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                        📈 Executed Asset Charts
+                    </h2>
+                    <p class="text-xs text-slate-400">High-resolution plots for the successfully traded Top 70 symbols.</p>
+                    <div id="tradedChartsContainer" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <!-- JS Populated Images -->
+                    </div>
+                </div>
+
+                <hr class="border-[#262730]"/>
+
+                <!-- Broker Audit Table -->
+                <div class="space-y-4">
+                    <h2 class="text-lg font-bold text-white flex items-center gap-2">📋 Executed Broker Orders Audit Log</h2>
+                    <div class="border border-[#31333f] rounded-xl overflow-hidden overflow-x-auto bg-[#1e232d]">
+                        <table class="w-full text-xs text-left text-slate-300 font-mono">
+                            <thead class="bg-[#161b26] text-slate-400 uppercase text-[10px] border-b border-[#31333f]">
+                                <tr>
+                                    <th class="p-3">#</th>
+                                    <th class="p-3">Time</th>
+                                    <th class="p-3">Symbol</th>
+                                    <th class="p-3">Type</th>
+                                    <th class="p-3 text-right">Qty</th>
+                                    <th class="p-3 text-right">Price</th>
+                                    <th class="p-3 text-right">Value (₹)</th>
+                                    <th class="p-3 text-right">Yield (₹)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="brokerTableBody" class="divide-y divide-[#262730]"></tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <div class="pb-10"></div> 
+            </div>
+        </main>
+    </div>
+
+    <script>
+        let registryData = [];
+        let brokerData = [];
+        let tradedImages = {};
+        let pngUniverse = [];
+
+        function sendMessageToStreamlitClient(type, data) {
+            const outData = Object.assign({ isStreamlitMessage: true, type: type }, data);
+            window.parent.postMessage(outData, "*");
+        }
+
+        const resizeObserver = new ResizeObserver(entries => {
+            for (let entry of entries) {
+                const newHeight = entry.contentRect.height;
+                sendMessageToStreamlitClient("streamlit:setFrameHeight", { height: newHeight + 100 });
+            }
+        });
+
+        window.addEventListener("load", function() {
+            sendMessageToStreamlitClient("streamlit:componentReady", { apiVersion: 1 });
+            resizeObserver.observe(document.body);
+        });
+
+        window.addEventListener("message", function(event) {
+            if (event.data.type === "streamlit:render") {
+                const args = event.data.args;
+                
+                if (args.registry && args.registry.length > 0) {
+                    registryData = args.registry;
+                    document.getElementById('loadingState').classList.add('hidden');
+                    document.getElementById('dashboardContent').classList.remove('hidden');
+                }
+                
+                if (args.broker) brokerData = args.broker;
+                if (args.images) tradedImages = args.images;
+                if (args.png_universe) pngUniverse = args.png_universe;
+                
+                if (registryData.length > 0) {
+                    renderDashboard();
+                }
+            }
+        });
+
+        function renderDashboard() {
+            // Deduplicate to get purely unique symbols that were traded
+            const tradedUniqueSymbols = [...new Set(brokerData.map(b => b.Symbol.toUpperCase()))];
+            
+            // Only count symbols that exist in the PNG universe we uploaded
+            const capturedFromTop70 = tradedUniqueSymbols.filter(sym => pngUniverse.includes(sym));
+
+            const totalTurnover = brokerData.reduce((acc, b) => acc + (parseFloat(b.Value) || 0), 0);
+            const totalYield = brokerData.reduce((acc, b) => acc + (parseFloat(b.YieldVal) || 0), 0);
+            const yieldPct = totalTurnover > 0 ? (totalYield / totalTurnover * 100) : 0;
+
+            // 1. Update Metrics
+            document.getElementById('metricScanned').innerText = pngUniverse.length > 0 ? pngUniverse.length : "N/A";
+            document.getElementById('metricCaptured').innerText = capturedFromTop70.length;
+            const captureRate = pngUniverse.length > 0 ? (capturedFromTop70.length / pngUniverse.length * 100) : 0;
+            document.getElementById('metricCapturedSub').innerText = `${captureRate.toFixed(1)}% of Uploaded PNGs`;
+            
+            document.getElementById('metricFills').innerText = `${brokerData.length}`;
+            document.getElementById('metricTurnover').innerText = `₹${totalTurnover.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            
+            const sign = totalYield >= 0 ? '+' : '';
+            document.getElementById('metricYield').innerText = `${sign}₹${totalYield.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            document.getElementById('metricYieldSub').innerText = `${sign}${yieldPct.toFixed(2)}%`;
+
+            // 2. NEW: Clean Distinct Traded List
+            const uniqueContainer = document.getElementById('tradedUniqueContainer');
+            if (capturedFromTop70.length === 0) {
+                uniqueContainer.innerHTML = `<span class="text-sm text-slate-500">No matching executed symbols found from the uploaded PNGs.</span>`;
+            } else {
+                uniqueContainer.innerHTML = capturedFromTop70.map(sym => {
+                    // Find the true rank of this symbol based on the registry
+                    const regMatch = registryData.find(r => r.Symbol.toUpperCase() === sym);
+                    const rankLabel = regMatch && regMatch.Rank ? String(regMatch.Rank).padStart(2, '0') : "??";
+                    
+                    return `
+                    <div class="bg-emerald-950/40 border border-emerald-500/50 shadow-[0_0_10px_rgba(16,185,129,0.15)] rounded-full py-1.5 px-4 flex items-center gap-2">
+                        <span class="text-xs font-mono text-emerald-500/80">#${rankLabel}</span>
+                        <span class="text-sm font-bold text-emerald-400 tracking-wide">${sym}</span>
+                        <i class="fa-solid fa-check-circle text-[10px] text-emerald-500"></i>
+                    </div>`;
+                }).join('');
+            }
+
+            // 3. Group data for Parallel Analysis
+            const symbolSummary = {};
+            tradedUniqueSymbols.forEach(sym => {
+                const fills = brokerData.filter(b => b.Symbol.toUpperCase() === sym);
+                const regMatch = registryData.find(r => r.Symbol.toUpperCase() === sym);
+                symbolSummary[sym] = {
+                    Rank: regMatch ? regMatch.Rank : 'N/A',
+                    Orders: fills.length,
+                    Qty: fills.reduce((acc, f) => acc + (parseFloat(f.Qty) || 0), 0),
+                    Turnover: fills.reduce((acc, f) => acc + (parseFloat(f.Value) || 0), 0),
+                    Yield: fills.reduce((acc, f) => acc + (parseFloat(f.YieldVal) || 0), 0)
+                };
+            });
+
+            // 4. Parallel Side-by-Side UI
+            const leftContainer = document.getElementById('leftTransactionsContainer');
+            const rightContainer = document.getElementById('rightYieldContainer');
+
+            if (tradedUniqueSymbols.length === 0) {
+                leftContainer.innerHTML = `<div class="p-4 text-xs text-slate-500 border border-[#31333f] rounded-lg">No executed symbols found today.</div>`;
+                rightContainer.innerHTML = `<div class="p-4 text-xs text-slate-500 border border-[#31333f] rounded-lg">No yield recorded.</div>`;
+            } else {
+                leftContainer.innerHTML = tradedUniqueSymbols.map(sym => {
+                    const item = symbolSummary[sym];
+                    return `
+                    <div class="st-card p-3 flex justify-between items-center">
+                        <div>
+                            <span class="st-badge-traded">Rank #${item.Rank}</span>
+                            <strong class="text-sm text-white ml-2">${sym}</strong>
+                        </div>
+                        <div class="text-right font-mono text-xs">
+                            <span class="text-amber-400 font-bold block">${item.Orders} Fills</span>
+                            <span class="text-[#94a3b8] text-[11px]">${item.Qty} Shares | ₹${item.Turnover.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                        </div>
+                    </div>`;
+                }).join('');
+
+                rightContainer.innerHTML = tradedUniqueSymbols.map(sym => {
+                    const item = symbolSummary[sym];
+                    const retPct = item.Turnover > 0 ? (item.Yield / item.Turnover * 100) : 0;
+                    const ySign = item.Yield >= 0 ? '+' : '';
+                    const colorClass = item.Yield >= 0 ? 'text-emerald-400' : 'text-rose-400';
+                    const borderClass = item.Yield >= 0 ? 'border-emerald-500/40' : 'border-rose-500/40';
+                    
+                    return `
+                    <div class="st-card p-3 flex justify-between items-center ${borderClass}">
+                        <div><strong class="text-sm text-white block">${sym}</strong></div>
+                        <div class="text-right font-mono">
+                            <span class="${colorClass} font-bold text-sm block">${ySign}₹${item.Yield.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                            <span class="st-badge-traded">${ySign}${retPct.toFixed(2)}%</span>
+                        </div>
+                    </div>`;
+                }).join('');
+            }
+
+            document.getElementById('leftTotalTurnover').innerText = `₹${totalTurnover.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+            document.getElementById('rightTotalYieldVal').innerText = `${sign}₹${totalYield.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+            document.getElementById('rightTotalYieldPct').innerText = `${sign}${yieldPct.toFixed(2)}%`;
+
+            // 5. Render Charts
+            const chartContainer = document.getElementById('tradedChartsContainer');
+            if (Object.keys(tradedImages).length === 0) {
+                chartContainer.innerHTML = `<div class="p-4 text-xs text-slate-500 border border-[#31333f] rounded-lg md:col-span-2">No matching PNG files found for the traded ranks. Upload matching Top 70 JPG/PNGs.</div>`;
+            } else {
+                let chartsHtml = '';
+                for (const [sym, b64str] of Object.entries(tradedImages)) {
+                    const rankObj = symbolSummary[sym];
+                    const rankLabel = rankObj ? `Rank #${String(rankObj.Rank).padStart(2, '0')}` : '';
+                    
+                    chartsHtml += `
+                    <div class="st-card p-4 space-y-3">
+                        <div class="flex justify-between items-center border-b border-[#262730] pb-2">
+                            <div>
+                                <h4 class="font-bold text-white text-lg">${sym}</h4>
+                                <span class="text-xs text-emerald-500 font-mono font-bold">${rankLabel}</span>
+                            </div>
+                            <span class="st-badge-traded"><i class="fa-solid fa-check"></i> Executed</span>
+                        </div>
+                        <img src="${b64str}" alt="${sym} Chart" class="w-full h-auto rounded border border-[#31333f] bg-[#0e1117] loading='lazy'">
+                    </div>`;
+                }
+                chartContainer.innerHTML = chartsHtml;
+            }
+
+            // 6. Update Audit Table
+            const tbody = document.getElementById('brokerTableBody');
+            if (brokerData.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="8" class="p-3 text-center text-slate-500">No broker fills logged</td></tr>`;
+            } else {
+                tbody.innerHTML = brokerData.map((b, i) => {
+                    const tType = (b.Type || 'BUY').toString().toUpperCase();
+                    const badgeClass = tType.includes('SELL') ? 'st-badge-sell' : 'st-badge-buy';
+                    
+                    return `
+                    <tr class="hover:bg-[#262730] transition border-b border-[#262730] last:border-0">
+                        <td class="p-3 text-slate-400">#${i+1}</td>
+                        <td class="p-3 text-slate-400">${b.Time || '--:--'}</td>
+                        <td class="p-3 font-bold text-emerald-400">${b.Symbol}</td>
+                        <td class="p-3"><span class="${badgeClass}">${tType}</span></td>
+                        <td class="p-3 text-right text-slate-200">${b.Qty}</td>
+                        <td class="p-3 text-right text-slate-300">₹${Number(b.Price).toFixed(2)}</td>
+                        <td class="p-3 text-right font-bold text-white">₹${Number(b.Value).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                        <td class="p-3 text-right font-bold text-emerald-400">+₹${Number(b.YieldVal).toFixed(2)}</td>
+                    </tr>`;
+                }).join('');
+            }
+        }
+    </script>
+</body>
+</html>
